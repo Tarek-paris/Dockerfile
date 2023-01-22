@@ -1,39 +1,43 @@
-FROM phusion/baseimage:latest                                                                                                                                                                                        
+FROM debian:stretch
 
-MAINTAINER George Vagenas - gvagenas@telestax.com                                                                                                                                                                    
-MAINTAINER Jean Deruelle - jean.deruelle@telestax.com                                                                                                                                                                
-MAINTAINER Lefteris Banos - liblefty@telestax.com                                                                                                                                                                    
-MAINTAINER Gennadiy Dubina - gennadiy.dubina@dataart.com                                                                                                                                                             
+ARG BUILD_STRING
+ARG BUILD_DATE
+ARG BUILD_TIME
 
-### install java and etc ###                                                                                                                                                                                         
-ENV DEBIAN_FRONTEND noninteractive                                                                                                                                                                                   
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections                                                                                                                                   
-RUN locale-gen en_US en_US.UTF-8 && dpkg-reconfigure locales                                                                                                                                                         
-RUN add-apt-repository ppa:openjdk-r/ppa -y && apt-cache search mysql-client-core && apt-get update && apt-get install -y wget ipcalc bsdtar openjdk-7-jdk mysql-client-core-5.7 openssl unzip && apt-get autoremove 
-&& apt-get autoclean && rm -rf /var/lib/apt/lists/*                                                                                                                                                                  
+LABEL build.string $BUILD_STRING
+LABEL build.date   $BUILD_DATE
+LABEL build.time   $BUILD_TIME
 
-### end ###                                                                                                                                                                                                          
+ENV DEBIAN_FRONTEND noninteractive
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en
+ENV container docker
 
-# create work dir                                                                                                                                                                                                    
-ENV SBC_DIR /opt/sbc                                                                                                                                                                                                 
-ENV SBC_APP_DIR "/opt/sbc/SBC-Tomcat"                                                                                                                                                                                
-#ENV SBC_CONFIG /opt/sbc/webapps/restcomm-sbc/WEB-INF/conf/sbc.xml                                                                                                                                                   
+RUN apt-get update \
+   && apt-get update -y \
+   && apt-get upgrade -y \
+   && apt-get install -y --allow-unauthenticated \
+        apt-utils \
+        wget \
+        gnupg2 \
+        systemd \
+        locales \
+   && sed -i 's/\# \(en_US.UTF-8\)/\1/' /etc/locale.gen \
+   && locale-gen \
+   && wget -O- http://downloads.3cx.com/downloads/3cxpbx/public.key | apt-key add - \
+   && echo "deb http://downloads.3cx.com/downloads/debian stretch main" | tee /etc/apt/sources.list.d/3cxpbx.list \
+   && apt-get update -y \
+   && apt-get install -y --allow-unauthenticated \
+      libcurl3=7.38.0-4+deb8u5 \
+      $(apt-cache depends 3cxpbx | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ') \
+   && rm -f /lib/systemd/system/multi-user.target.wants/* \
+   && rm -f /etc/systemd/system/*.wants/* \
+   && rm -f /lib/systemd/system/local-fs.target.wants/* \
+   && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
+   && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
+   && rm -f /lib/systemd/system/basic.target.wants/* \
+   && rm -f /lib/systemd/system/anaconda.target.wants/*
 
-# download build                                                                                                                                                                                                     
-RUN mkdir ${SBC_DIR}                                                                                                                                                                                                 
-RUN wget -qO- https://mobicents.ci.cloudbees.com/view/RestComm/job/Restcomm-SBC/lastSuccessfulBuild/artifact/sbc-version.txt -O version.txt                                                                          
-RUN wget -qc --no-check-certificate "https://webukraine-my.sharepoint.com/personal/denis_zaytsev_mobius-software_com/_layouts/15/guestaccess.aspx?docid=0ea8e3826f417421f94fe1f3e0416e5d4&authkey=AXQKu_-sEqw7ajmQWlK
-yVPw" -O ${SBC_DIR}/SBC.zip                                                                                                                                                                                          
+EXPOSE 8080/tcp 5001/tcp 5060/tcp 5060/udp 5061/tcp 5090/tcp 5090/udp 9000-9500/udp
 
-RUN unzip -o ${SBC_DIR}/SBC.zip -d ${SBC_DIR}                                                                                                                                                                        
-RUN mv ${SBC_DIR}/SBC-Tomcat7-`cat version.txt` ${SBC_APP_DIR}                                                                                                                                                       
-
-RUN chmod +x $SBC_APP_DIR/bin/sbc-configuration-docker.sh                                                                                                                                                            
-RUN chmod +x ${SBC_APP_DIR}/bin/sbc-docker.sh                                                                                                                                                                        
-RUN chmod +x ${SBC_APP_DIR}/bin/certs-docker.sh                                                                                                                                                                      
-RUN chmod +x ${SBC_APP_DIR}/bin/catalina.sh                                                                                                                                                                          
-
-RUN ${SBC_APP_DIR}"/bin/sbc-docker.sh" -a start                                                                                                                                                                      
-CMD ${SBC_APP_DIR}"/bin/catalina.sh" run                                                                                                                                                                             
-
-EXPOSE 8080
+CMD ["/lib/systemd/systemd"]
