@@ -1,4 +1,4 @@
-FROM flaviostutz/freepbx:latest
+FROM freepbx/sng7-tiny:latest
 
 
 EXPOSE 8080
