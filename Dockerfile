@@ -1,4 +1,4 @@
-FROM technoexpress/freepbx:latest
+FROM tiredofit/freepbx:latest
 
 
-EXPOSE 8080
+EXPOSE 80
