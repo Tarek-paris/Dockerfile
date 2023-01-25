@@ -1,42 +1,82 @@
-FROM debian:stretch
+FROM debian:11
 
-ARG BUILD_STRING
-ARG BUILD_DATE
-ARG BUILD_TIME
 
-LABEL build.string $BUILD_STRING
-LABEL build.date $BUILD_DATE
-LABEL build.time $BUILD_TIME
-
-ENV DEBIAN_FRONTEND noninteractive
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en
-ENV container docker
 
 RUN apt-get update -y \
  && apt-get upgrade -y \
- && apt-get install -y --allow-unauthenticated \
- apt-utils \
- wget \
- gnupg2 \
- systemd \
- locales \
- && sed -i 's/\# \(en_US.UTF-8\)/\1/' /etc/locale.gen \
- && locale-gen \
- && wget -O- http://downloads.3cx.com/downloads/3cxpbx/public.key | apt-key add - \  
- && echo "deb http://downloads.3cx.com/downloads/debian stretch main" | tee /etc/apt/sources.list.d/3cxpbx.list \
- && apt-get update -y \
- && apt-get install -y --allow-unauthenticated \
- net-tools \
- $(apt-cache depends 3cxpbx | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ') \
- && rm -f /lib/systemd/system/multi-user.target.wants/* \
- && rm -f /etc/systemd/system/*.wants/* \
- && rm -f /lib/systemd/system/local-fs.target.wants/* \
- && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
- && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
- && rm -f /lib/systemd/system/basic.target.wants/* \
- && rm -f /lib/systemd/system/anaconda.target.wants/*
+ && apt install -y util-linux apache2 mariadb-server mariadb-client php php-curl php-cli php-pdo php-mysql php-pear php-gd php-mbstring php-intl php-bcmath curl sox mpg123 lame ffmpeg sqlite3 git unixodbc sudo dirmngr postfix asterisk odbc-mariadb php-ldap nodejs npm pkg-config libicu-dev \
+ && systemctl stop asterisk \
+ && systemctl disable asterisk \
+ && cd /etc/asterisk \
+ && mkdir DIST \
+ && mv * DIST \
+ && cp DIST/asterisk.conf . \
+ && sed -i 's/(!)//' asterisk.conf \
+ && touch modules.conf \
+ && touch cdr.conf\
+ && sed -i 's/\(^upload_max_filesize = \).*/\120M/' /etc/php/7.4/apache2/php.ini \
+ && sed -i 's/\(^memory_limit = \).*/\1256M/' /etc/php/7.4/apache2/php.ini \
+ && sed -i 's/^\(User\|Group\).*/\1 asterisk/' /etc/apache2/apache2.conf \
+ && sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf \
+ && a2enmod rewrite \
+ && systemctl restart apache2 \
+ && rm /var/www/html/index.html \
+ && cat <<EOF > /etc/odbcinst.ini
+[MySQL]
+Description = ODBC for MySQL (MariaDB)
+Driver = /usr/lib/x86_64-linux-gnu/odbc/libmaodbc.so
+FileUsage = 1
+EOF \
+ 
+&& cat <<EOF > /etc/odbc.ini
+[MySQL-asteriskcdrdb]
+Description = MySQL connection to 'asteriskcdrdb' database
+Driver = MySQL
+Server = localhost
+Database = asteriskcdrdb
+Port = 3306
+Socket = /var/run/mysqld/mysqld.sock
+Option = 3
+EOF \
+&& cd /usr/local/src \
+&& wget http://mirror.freepbx.org/modules/packages/freepbx/7.4/freepbx-16.0-latest.tgz \
+&& tar zxvf freepbx-16.0-latest.tgz \
+&& cd /usr/local/src/freepbx/ \
+&& ./start_asterisk start \
+&& ./install -n \
+&& fwconsole ma installall \
+&& fwconsole reload \
+&& cd /usr/share/asterisk \
+&& mv sounds sounds-DIST \
+&& ln -s /var/lib/asterisk/sounds sounds \
+&& fwconsole restart \
+&& cat <<EOF > /etc/systemd/system/freepbx.service
+[Unit]
+Description=FreePBX VoIP Server
+After=mariadb.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/fwconsole start -q
+ExecStop=/usr/sbin/fwconsole stop -q
+[Install]
+WantedBy=multi-user.target
+EOF \
+ 
+&& systemctl daemon-reload \
+&& systemctl enable freepbx
+EXPOSE 80
 
-EXPOSE 5015/tcp 5001/tcp 5060/tcp 5060/udp 5061/tcp 5090/tcp 5090/udp 9000-9500/udp
 
-CMD ["/lib/systemd/systemd"]
+
+
+
+
+
+
+
+
+
+
+
+
