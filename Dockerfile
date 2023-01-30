@@ -1,2 +1,2 @@
-FROM bitnami/jenkins:latest
+FROM jenkins:latest
 EXPOSE 8080
