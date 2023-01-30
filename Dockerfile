@@ -1,2 +1,2 @@
-FROM jenkins:2.60.3
+FROM jenkins/jenkins:2.375-alpine
 EXPOSE 8080
