@@ -1,3 +1,3 @@
-FROM jenkins:2.60.3
+FROM  jenkins:2.60.2
 
 EXPOSE 8080
