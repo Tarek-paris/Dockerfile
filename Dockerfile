@@ -1,3 +1,3 @@
-FROM fatmabe/devops-project:191
+FROM jenkins:latest
 
 EXPOSE 8080
