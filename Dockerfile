@@ -1,3 +1,2 @@
-FROM  jenkins:2.60.2
-
+FROM  jenkins/jnlp-slave:latest
 EXPOSE 8080
